@@ -1,0 +1,53 @@
+ THIS IS THE COMMAND -->cat /etc/os-release && uname -r
+ This was tried and tested on : PRETTY_NAME="Parrot Security 6.4 (lorikeet)"
+                                NAME="Parrot Security"
+								VERSION_ID="6.4"
+								VERSION="6.4 (lorikeet)"
+								VERSION_CODENAME=lory
+								ID=debian
+								6.12.12-amd64
+
+
+clang -O2 -target bpf -D__TARGET_ARCH_x86 \
+  -I/usr/include/x86_64-linux-gnu \
+  -I/lib/modules/$(uname -r)/build/include \
+  -I/lib/modules/$(uname -r)/build/include/uapi \
+  -I/lib/modules/$(uname -r)/build/include/generated/uapi \
+  -I/lib/modules/$(uname -r)/build/arch/x86/include \
+  -I/lib/modules/$(uname -r)/build/arch/x86/include/generated \
+  -g -c tls_mon.c -o tls_mon.o
+
+bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+
+
+gcc -O2 -I/usr/include/x86_64-linux-gnu \
+  -I/lib/modules/$(uname -r)/build/include \
+  -I/lib/modules/$(uname -r)/build/include/uapi \
+  -I/lib/modules/$(uname -r)/build/include/generated/uapi \
+  user_tls_mon.c -o user_tls_mon \
+  -lbpf -lssl -lcrypto -ljansson -lelf -lz
+
+
+
+
+
+Alternative: 
+Generate BTF using pahole if bpftool doesn't work
+pahole -J tls_mon.o
+
+
+If you don't have bpftool, try this approach - compile with debug info and use pahole
+clang -O2 -target bpf -D__TARGET_ARCH_x86 \
+  -I/usr/include/x86_64-linux-gnu \
+  -I/lib/modules/$(uname -r)/build/include \
+  -I/lib/modules/$(uname -r)/build/include/uapi \
+  -I/lib/modules/$(uname -r)/build/include/generated/uapi \
+  -I/lib/modules/$(uname -r)/build/arch/x86/include \
+  -I/lib/modules/$(uname -r)/build/arch/x86/include/generated \
+  -g -O2 -c tls_mon.c -o tls_mon_debug.o
+
+Then add BTF to the object
+pahole -J tls_mon_debug.o
+
+Copy it as the final object
+cp tls_mon_debug.o tls_mon.o
